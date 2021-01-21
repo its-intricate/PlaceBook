@@ -3,6 +3,8 @@ buildscript {
     ext {
         kotlin_version = "1.3.72"
         play_services_version = "17.0.0"
+        room_version = "1.1.1"
+        architecture_version = "1.1.1"
     }
 
     repositories {
