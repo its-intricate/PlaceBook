@@ -1,6 +1,7 @@
 package com.raywenderlich.placebook.ui
 
 import android.Manifest.*
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import androidx.appcompat.app.AppCompatActivity
@@ -34,6 +35,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private lateinit var placesClient: PlacesClient
     private lateinit var mapsViewModel: MapsViewModel
+
+
+//    SETUP
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -87,25 +91,29 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     companion object {
+        const val EXTRA_BOOKMARK_ID = "com.raywenderlich.placebook.EXTRA_BOOKMARK_ID"
         private const val REQUEST_LOCATION = 1
         private const val TAG = "MapsActivity"
     }
+
+
+//    LOCATION + PERMISSIONS
 
     private fun requestLocationPermissions() {
         ActivityCompat.requestPermissions(this, arrayOf(permission.ACCESS_FINE_LOCATION), REQUEST_LOCATION)
     }
 
     override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
+            requestCode: Int,
+            permissions: Array<String>,
+            grantResults: IntArray
     ) {
         if (requestCode == REQUEST_LOCATION) {
-           if (grantResults.size == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-               getCurrentLocation()
-           } else {
-               Log.e(TAG, "Location permission denied")
-           }
+            if (grantResults.size == 1 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                getCurrentLocation()
+            } else {
+                Log.e(TAG, "Location permission denied")
+            }
         }
     }
 
@@ -128,10 +136,13 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         }
     }
-    
+
+
+//    BOOKMARKS
+
     private fun createBookmarkMarkerObserver() {
         mapsViewModel.getBookmarkMarkerViews()?.observe(
-            this, androidx.lifecycle
+                this, androidx.lifecycle
                 .Observer<List<MapsViewModel.BookmarkMarkerView>> {
                     map.clear()
                     it?.let {
@@ -140,32 +151,55 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 }
         )
     }
-    
+
     private fun displayAllBookmarks(bookmarks: List<MapsViewModel.BookmarkMarkerView>) {
         for (bookmark in bookmarks) {
             addPlaceMarker(bookmark)
         }
     }
-    
+
     private fun addPlaceMarker(bookmark: MapsViewModel.BookmarkMarkerView): Marker? {
         val marker = map.addMarker(MarkerOptions()
-            .position(bookmark.location)
-            .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
-            .alpha(0.8f))
+                .position(bookmark.location)
+                .title(bookmark.name)
+                .snippet(bookmark.phone)
+                .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_AZURE))
+                .alpha(0.8f))
         marker.tag = bookmark
-        
+
         return marker
     }
 
+    private fun startBookmarkDetails(bookmarkId: Long) {
+        val intent = Intent(this, BookmarkDetailsActivity::class.java)
+        intent.putExtra(EXTRA_BOOKMARK_ID, bookmarkId)
+        startActivity(intent)
+    }
+
     private fun handleInfoWindowClick(marker: Marker) {
-        val placeInfo = (marker.tag as PlaceInfo)
-        if (placeInfo.place != null) {
-            GlobalScope.launch {
-                mapsViewModel.addBookmarkFromPlace(placeInfo.place, placeInfo.image)
+        when (marker.tag) {
+            is PlaceInfo -> {
+                val placeInfo = (marker.tag as PlaceInfo)
+                if (placeInfo.place != null) {
+                    GlobalScope.launch {
+                        mapsViewModel.addBookmarkFromPlace(placeInfo.place, placeInfo.image)
+                    }
+                }
+                marker.remove()
+            }
+
+            is MapsViewModel.BookmarkMarkerView -> {
+                val bookmarkMarkerView = (marker.tag as MapsViewModel.BookmarkMarkerView)
+                marker.hideInfoWindow()
+                bookmarkMarkerView.id?.let {
+                    startBookmarkDetails(it)
+                }
             }
         }
-        marker.remove()
     }
+
+
+//    DISPLAYS
 
     private fun displayPoi(pointOfInterest: PointOfInterest) {
         displayPoiGetPlaceStep(pointOfInterest)
@@ -197,7 +231,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
 
     private fun displayPoiGetPhotoStep(place: Place) {
-        val photoMetadata =  place.photoMetadatas?.get(0)
+        val photoMetadata = place.photoMetadatas?.get(0)
 
         if (photoMetadata == null) {
             displayPoiDisplayStep(place, null)
@@ -212,7 +246,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         placesClient.fetchPhoto(photoRequest).addOnSuccessListener { fetchPhotoResponse ->
             val bitmap = fetchPhotoResponse.bitmap
             displayPoiDisplayStep(place, bitmap)
-        }.addOnFailureListener {exception ->
+        }.addOnFailureListener { exception ->
             if (exception is ApiException) {
                 val statusCode = exception.statusCode
                 Log.e(TAG, "Place not found: ${exception.message}, statusCode: $statusCode")
@@ -227,7 +261,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
                 .snippet(place.phoneNumber)
         )
         marker?.tag = PlaceInfo(place, photo)
+        marker?.showInfoWindow()
     }
 
-   class PlaceInfo(val place: Place? = null, val image: Bitmap? = null)
+    class PlaceInfo(val place: Place? = null, val image: Bitmap? = null)
 }

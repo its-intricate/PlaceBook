@@ -6,7 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.raywenderlich.placebook.model.Bookmark
 
-@Database(entities = arrayOf(Bookmark::class), version = 1)
+@Database(entities = arrayOf(Bookmark::class), version = 2)
 abstract class PlaceBookDatabase : RoomDatabase() {
 
     abstract fun bookmarkDao(): BookmarkDao
@@ -17,12 +17,12 @@ abstract class PlaceBookDatabase : RoomDatabase() {
         fun getInstance(context: Context): PlaceBookDatabase {
             if (instance == null) {
                 instance = Room.databaseBuilder(
-                    context.applicationContext,
-                    PlaceBookDatabase::class.java,
-                    "PlaceBook").build()
+                        context.applicationContext, PlaceBookDatabase::class.java, "PlaceBook")
+                        .fallbackToDestructiveMigration()
+                        .build()
             }
 
-            return  instance as PlaceBookDatabase
+            return instance as PlaceBookDatabase
         }
     }
 }
